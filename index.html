@@ -191,16 +191,23 @@
     async function snapPointsIfEnabled(latlng) {
       if (!state.snapping || state.points.length === 0) return latlng;
       try {
-        const last = state.points[state.points.length-1];
+        const last = state.points[state.points.length - 1];
         const url = `https://router.project-osrm.org/route/v1/foot/${last.lng},${last.lat};${latlng.lng},${latlng.lat}?geometries=geojson&overview=full`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('Snap failed');
         const data = await res.json();
         const coords = data.routes?.[0]?.geometry?.coordinates || [];
-        for (let i=1;i<coords.length;i++) {
+        for (let i = 1; i < coords.length; i++) {
           const [lng, lat] = coords[i];
           addPoint(L.latLng(lat, lng), true);
         }
+        return null; // handled by adding snapped points
+      } catch (e) {
+        console.warn(e);
+        toast('Snapping failed – added raw point');
+        return latlng;
+      }
+    }
         return null; // handled by adding snapped points
       } catch (e) {
         console.warn(e);
