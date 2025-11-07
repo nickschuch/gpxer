@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RunRoute – Map, Distance, Elevation & GPX</title>
+  <title>RunRoute – Map, Distance & GPX Export</title>
   <link rel="preconnect" href="https://unpkg.com" crossorigin>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <style>
@@ -24,17 +24,16 @@
       background: var(--panel-bg);
       border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.15);
       color: var(--text);
-      padding: 12px; min-width: 300px; max-width: 460px;
+      padding: 12px; min-width: 280px;
     }
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .distance { font-size: 24px; font-weight: 700; }
     .muted { color: var(--muted); font-size: 12px; }
     .btns { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; margin-top: 10px; }
     button {
       appearance: none; border: 0; padding: 10px 12px; border-radius: 12px; cursor: pointer;
-      background: #e2e8f0; font-weight: 600; transition: transform .06s ease, box-shadow .2s ease;
+      background: #e2e8f0; font-weight: 600; transition: transform .06s ease, box-shadow .2s ease; 
       box-shadow: 0 2px 0 rgba(0,0,0,.12);
-      white-space: nowrap;
     }
     button:hover { transform: translateY(-1px); }
     .primary { background: var(--brand); color: white; }
@@ -47,15 +46,12 @@
       border-radius: 12px; padding: 8px 10px; color: var(--muted); font-size: 12px;
       box-shadow: 0 6px 24px rgba(0,0,0,.15);
     }
-    .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 1100;
+    .toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 1100; 
       background: rgba(17,24,39,.9); color: white; padding: 10px 14px; border-radius: 12px; display:none; }
     .stat { display:flex; align-items:center; gap:8px; }
     .stat div { line-height: 1.05; }
     .stat small { display:block; font-size:11px; color:var(--muted); }
-    .pill { background:#f1f5f9; padding:6px 8px; border-radius:10px; font-size:12px; }
-    .pace-row { display:flex; gap:8px; align-items:center; margin-top:8px; }
-    .pace-row input { width:80px; padding:8px 10px; border-radius:10px; border:1px solid #cbd5e1; font-weight:600; }
-    @media (max-width: 640px) { .panel { min-width: 0; width: calc(100% - 24px);} .btns{grid-template-columns: repeat(3, minmax(0,1fr));} }
+    @media (max-width: 640px) { .panel { min-width: 0; width: calc(100% - 24px);} }
   </style>
 </head>
 <body>
@@ -70,36 +66,24 @@
             <small class="muted" id="segments">0 points • 0 segments</small>
           </div>
         </div>
-        <div class="stat">
-          <div>
-            <div class="pill" id="elev">Elevation gain: — m</div>
-            <small class="muted" id="eta">ETA at pace —:—</small>
-          </div>
-        </div>
         <button id="exportBtn" class="primary" title="Download GPX" disabled>Export GPX</button>
       </div>
-      <div class="pace-row">
-        <label class="muted">Target pace</label>
-        <input id="pace" type="text" inputmode="numeric" placeholder="5:00" title="mm:ss per km"/>
-        <button id="paceReset" title="Reset pace">Reset</button>
-      </div>
       <div class="btns">
-        <button id="startHereBtn" class="ok" title="Add first point at my location">Start Here</button>
-        <button id="locateBtn" title="Go to my location">Locate</button>
         <button id="undoBtn" title="Remove last point" disabled>Undo</button>
         <button id="clearBtn" class="danger" title="Clear all" disabled>Clear</button>
+        <button id="startHereBtn" class="ok" title="Add first point at my location">Start Here</button>
+        <button id="locateBtn" class="ok" title="Go to my location">Locate</button>
         <button id="snapBtn" title="Enable/Disable snap to road">Snap: Off</button>
-        <button id="importBtn" title="Import GPX">Import GPX</button>
       </div>
-      <input type="file" id="gpxFile" accept=".gpx,application/gpx+xml" style="display:none" />
-      <div class="tiny muted" style="margin-top:8px">Click the map to add points. Drag points to refine the route. Double-click to finish a segment.</div>
+      <div class="tiny muted" style="margin-top:8px">Click the map to add points. Drag points to refine the route. Double‑click to finish a segment.</div>
     </div>
     <div class="legend">Data © OpenStreetMap contributors</div>
     <div class="toast" id="toast"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <!-- Optional: snap-to-road via OpenRouteService (set API key in code). Off by default. -->
+  <!-- <!-- Optional: snap-to-road via OSRM public demo (no key). Rate-limited; for personal use only. -->
+  
   <script>
     // ===== Utilities =====
     const fmtKm = (m) => (m/1000).toFixed(2) + ' km';
@@ -125,54 +109,6 @@
       el.textContent = msg; el.style.display = 'block';
       setTimeout(()=> el.style.display='none', ms);
     }
-    const defer = (ms)=> new Promise(r=>setTimeout(r,ms));
-
-    // ===== Elevation (Open-Elevation API) =====
-    const elevationCache = new Map();
-    async function getElevation(latlng){
-      const key = `${latlng.lat.toFixed(5)},${latlng.lng.toFixed(5)}`;
-      if (elevationCache.has(key)) return elevationCache.get(key);
-      try {
-        const url = `https://api.open-elevation.com/api/v1/lookup?locations=${latlng.lat},${latlng.lng}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('elev fetch failed');
-        const data = await res.json();
-        const h = data.results?.[0]?.elevation ?? null;
-        elevationCache.set(key, h);
-        return h;
-      } catch(e){
-        console.warn('Elevation error', e); return null;
-      }
-    }
-    async function computeElevationGain(points){
-      if (points.length < 2) return null;
-      let gain = 0; let prev = null;
-      for (let i=0;i<points.length;i++){
-        const h = await getElevation(points[i]);
-        if (h==null) continue;
-        if (prev!=null){ const d = h - prev; if (d>0) gain += d; }
-        prev = h;
-        if (i%25===0) await defer(10); // avoid rate limits
-      }
-      return Math.round(gain);
-    }
-
-    // ===== Pace helpers =====
-    function parsePace(str){
-      if(!str) return null;
-      const m = str.trim().match(/^(\d+):(\d{1,2})$/);
-      if(!m) return null;
-      const min = parseInt(m[1],10), sec = parseInt(m[2],10);
-      return min*60 + sec; // seconds per km
-    }
-    function fmtHMS(totalSeconds){
-      if (totalSeconds==null || !isFinite(totalSeconds)) return '—';
-      const s = Math.round(totalSeconds);
-      const h = Math.floor(s/3600);
-      const m = Math.floor((s%3600)/60);
-      const sec = s%60;
-      return (h>0? `${h}:` : '') + `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-    }
 
     // ===== Map Setup =====
     const map = L.map('map', { zoomControl: true }).setView([ -37.8136, 144.9631 ], 13); // Melbourne default
@@ -184,14 +120,7 @@
     // Layers & State
     const routeLine = L.polyline([], { color: '#0ea5e9', weight: 5, opacity: 0.9 }).addTo(map);
     const markers = []; // L.Marker list mirroring points
-    const state = { points: [], snapping: false, orsKey: '' /* optional OpenRouteService API key for snapping */ };
-
-    async function refreshElevationUI(){
-      const el = document.getElementById('elev');
-      el.textContent = 'Elevation gain: …';
-      const gain = await computeElevationGain(state.points);
-      el.textContent = `Elevation gain: ${gain==null? '—' : gain + ' m'}`;
-    }
+    const state = { points: [], snapping: false };
 
     function updateUI() {
       routeLine.setLatLngs(state.points);
@@ -202,18 +131,6 @@
       document.getElementById('undoBtn').disabled = !hasPts;
       document.getElementById('clearBtn').disabled = !hasPts;
       document.getElementById('exportBtn').disabled = state.points.length < 2;
-
-      // Pace ETA
-      const p = parsePace(localStorage.getItem('runroute_pace') || document.getElementById('pace').value);
-      if (p){
-        const etaSec = (dist/1000) * p;
-        document.getElementById('eta').textContent = `ETA at pace ${document.getElementById('pace').value || '—'} → ${fmtHMS(etaSec)}`;
-      } else {
-        document.getElementById('eta').textContent = `ETA at pace —:—`;
-      }
-
-      // Elevation
-      refreshElevationUI();
     }
 
     function addPoint(latlng, draggable=true) {
@@ -270,39 +187,28 @@
       toast('GPX downloaded');
     }
 
-    // GPX Import
-    async function importGPX(text){
-      try{
-        const xml = new DOMParser().parseFromString(text, 'application/xml');
-        const pts = Array.from(xml.getElementsByTagName('trkpt'));
-        if (!pts.length) { toast('No track points found'); return; }
-        clearAll();
-        const latlngs = pts.map(n => L.latLng(parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))));
-        latlngs.forEach(ll=> addPoint(ll, true));
-        map.fitBounds(L.latLngBounds(latlngs), { padding:[30,30] });
-        toast('GPX imported');
-      } catch(e){ console.warn(e); toast('Failed to import GPX'); }
-    }
-
     // Optional: snap to road using OpenRouteService if API key is present and snapping enabled
     async function snapPointsIfEnabled(latlng) {
-      if (!state.snapping || !state.orsKey || state.points.length === 0) return latlng;
+      if (!state.snapping || state.points.length === 0) return latlng;
       try {
         const last = state.points[state.points.length-1];
-        const coords = [[last.lng, last.lat], [latlng.lng, latlng.lat]];
-        const params = { coordinates: coords, instructions: false };
-        const res = await fetch('https://api.openrouteservice.org/v2/directions/foot-walking/geojson', {
-          method: 'POST', headers: { 'Authorization': state.orsKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify(params)
-        });
+        const url = `https://router.project-osrm.org/route/v1/foot/${last.lng},${last.lat};${latlng.lng},${latlng.lat}?geometries=geojson&overview=full`;
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Snap failed');
         const data = await res.json();
-        const geom = data.features?.[0]?.geometry?.coordinates || [];
-        for (let i=1;i<geom.length;i++) {
-          const [lng, lat] = geom[i];
+        const coords = data.routes?.[0]?.geometry?.coordinates || [];
+        for (let i=1;i<coords.length;i++) {
+          const [lng, lat] = coords[i];
           addPoint(L.latLng(lat, lng), true);
         }
-        return null;
+        return null; // handled by adding snapped points
+      } catch (e) {
+        console.warn(e);
+        toast('Snapping failed – added raw point');
+        return latlng;
+      }
+    }
+    return null; // handled by adding snapped points
       } catch (e) {
         console.warn(e);
         toast('Snapping failed – added raw point');
@@ -322,14 +228,6 @@
     document.getElementById('undoBtn').addEventListener('click', removeLast);
     document.getElementById('clearBtn').addEventListener('click', clearAll);
     document.getElementById('exportBtn').addEventListener('click', exportGPX);
-    document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('gpxFile').click());
-    document.getElementById('gpxFile').addEventListener('change', async (e)=>{
-      const file = e.target.files?.[0]; if(!file) return;
-      const text = await file.text();
-      importGPX(text);
-      e.target.value = '';
-    });
-
     document.getElementById('locateBtn').addEventListener('click', () => {
       map.locate({ setView: true, maxZoom: 16 });
     });
@@ -342,40 +240,20 @@
         toast('Added starting point at your location');
       }, ()=> toast('Location permission denied'));
     });
-
+    });
     document.getElementById('snapBtn').addEventListener('click', () => {
       state.snapping = !state.snapping;
       document.getElementById('snapBtn').textContent = `Snap: ${state.snapping ? 'On' : 'Off'}`;
-      if (state.snapping && !state.orsKey) {
-        toast('Set your OpenRouteService API key in code to enable snapping');
+      if (state.snapping) {
+        toast('Snapping uses OSRM public demo; may be rate-limited');
+      }
+    });
       }
     });
 
-    // Pace controls
-    const paceInput = document.getElementById('pace');
-    const saved = localStorage.getItem('runroute_pace');
-    if (saved) paceInput.value = saved;
-    paceInput.addEventListener('input', ()=>{
-      const val = paceInput.value;
-      if (parsePace(val)) localStorage.setItem('runroute_pace', val);
-      updateUI();
-    });
-    document.getElementById('paceReset').addEventListener('click', ()=>{
-      localStorage.removeItem('runroute_pace'); paceInput.value = ''; updateUI();
-    });
-
-    // Geolocate on load; optional auto-start with ?start=here
-    map.once('load', ()=> {
-      map.locate({ setView: true, maxZoom: 15 });
-      const params = new URLSearchParams(location.search);
-      if (params.get('start') === 'here') {
-        navigator.geolocation.getCurrentPosition((pos)=>{
-          const ll = L.latLng(pos.coords.latitude, pos.coords.longitude);
-          addPoint(ll, true);
-          map.setView(ll, 16);
-        });
-      }
-    });
+    // Try geolocation on load
+    map.once('load', ()=> map.locate({ setView: true, maxZoom: 15 }));
+    // iOS needs explicit call sometimes
     setTimeout(() => map.fire('load'), 300);
 
     updateUI();
