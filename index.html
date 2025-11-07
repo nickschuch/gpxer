@@ -82,9 +82,22 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <!-- <!-- Optional: snap-to-road via OSRM public demo (no key). Rate-limited; for personal use only. -->
+  <!-- Optional: snap-to-road via OSRM public demo (no key). Rate-limited; for personal use only. -->
   
   <script>
+    // ===== Lightweight self-tests (dev only; harmless in prod) =====
+    (function runSelfTests(){
+      const approx = (a,b,tol=1e-3)=> Math.abs(a-b) <= tol*Math.max(1,Math.abs(a),Math.abs(b));
+      // Haversine of identical points is ~0
+      console.assert(approx(haversine(0,0,0,0), 0, 1e-6), 'Test: zero distance failed');
+      // 1° lon at equator ≈ 111.319 km
+      const d = haversine(0,0,0,1);
+      console.assert(Math.abs(d-111319) < 500, 'Test: 1° lon distance ~111.3km');
+      // sumDistance two-point equals haversine
+      const sd = sumDistance([{lat:0,lng:0},{lat:0,lng:1}]);
+      console.assert(Math.abs(sd-d) < 1, 'Test: sumDistance matches haversine');
+    })();
+
     // ===== Utilities =====
     const fmtKm = (m) => (m/1000).toFixed(2) + ' km';
     function haversine(lat1, lon1, lat2, lon2) {
@@ -187,7 +200,7 @@
       toast('GPX downloaded');
     }
 
-    // Optional: snap to road using OpenRouteService if API key is present and snapping enabled
+    // ===== Snap to road via OSRM public demo (no key) =====
     async function snapPointsIfEnabled(latlng) {
       if (!state.snapping || state.points.length === 0) return latlng;
       try {
@@ -197,25 +210,13 @@
         if (!res.ok) throw new Error('Snap failed');
         const data = await res.json();
         const coords = data.routes?.[0]?.geometry?.coordinates || [];
+        // Add intermediate snapped points (skip first since it duplicates the last point)
         for (let i = 1; i < coords.length; i++) {
           const [lng, lat] = coords[i];
           addPoint(L.latLng(lat, lng), true);
         }
-        return null; // handled by adding snapped points
-      } catch (e) {
-        console.warn(e);
-        toast('Snapping failed – added raw point');
-        return latlng;
-      }
-    }
-        return null; // handled by adding snapped points
-      } catch (e) {
-        console.warn(e);
-        toast('Snapping failed – added raw point');
-        return latlng;
-      }
-    }
-    return null; // handled by adding snapped points
+        // We already added the snapped geometry, so tell caller not to add the raw point
+        return null;
       } catch (e) {
         console.warn(e);
         toast('Snapping failed – added raw point');
@@ -247,14 +248,11 @@
         toast('Added starting point at your location');
       }, ()=> toast('Location permission denied'));
     });
-    });
     document.getElementById('snapBtn').addEventListener('click', () => {
       state.snapping = !state.snapping;
       document.getElementById('snapBtn').textContent = `Snap: ${state.snapping ? 'On' : 'Off'}`;
       if (state.snapping) {
         toast('Snapping uses OSRM public demo; may be rate-limited');
-      }
-    });
       }
     });
 
